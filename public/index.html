@@ -63,4 +63,6 @@ async function loadMsgs(){try{const d=await api('chats/'+cur+'/messages');hideLo
 async function send(){const t=$('tx').value.trim();if(!t)return;try{await api('chats/'+cur+'/messages','POST',{text:t,reply_to:replyTo});$('tx').value='';replyTo=null;$('rp').classList.add('hide');loadMsgs()}catch(e){if(e.locked)showLock();else alert(e.message)}}
 $('tx').addEventListener('keydown',e=>e.key==='Enter'&&send());$('tx').addEventListener('input',()=>io_&&cur&&io_.emit('typing',cur));
 function rep(){const r=prompt('Reason: spam / harassment / scam / threat / inappropriate / other');if(r)api('report','POST',{username:peer.username,reason:r}).then(()=>alert('Report sent.'))}
-init();</script></body></html>
+init();</script>
+<script src="/plugins.js"></script>
+</body></html>
