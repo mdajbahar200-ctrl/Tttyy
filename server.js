@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS blocks(blocker_id INTEGER REFERENCES users(id) ON DEL
 CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY,reporter_id INTEGER,reported_id INTEGER,message_id INTEGER,reason TEXT,description TEXT,status TEXT DEFAULT'open',created_at INTEGER DEFAULT(strftime('%s','now')));
 `);
 const app=express(),http=require('http').createServer(app),io=require('socket.io')(http);
-app.set('trust proxy',1);app.use(helmet());app.use(express.json({limit:'20kb'}));
+app.set('trust proxy',1);
+app.use(helmet({contentSecurityPolicy:{directives:{...helmet.contentSecurityPolicy.getDefaultDirectives(),"script-src":["'self'","'unsafe-inline'"],"script-src-attr":["'unsafe-inline'"]}}}));
+app.use(express.json({limit:'20kb'}));
 const sess=session({name:'pc.sid',secret:process.env.SESSION_SECRET,resave:false,saveUninitialized:false,
  cookie:{httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',maxAge:7*864e5}});
 app.use(sess);io.engine.use(sess);
