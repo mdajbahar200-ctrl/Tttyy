@@ -1,0 +1,66 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PrivateConnect</title><style>
+:root{--bg:#f5f6fa;--card:#fff;--tx:#14151a;--mut:#6b7080;--ac:linear-gradient(135deg,#5b6cff,#8b5cf6);--in:#e9ebf3;--bd:#e2e4ee}
+@media(prefers-color-scheme:dark){:root{--bg:#0e0f13;--card:#181a21;--tx:#eceef5;--mut:#9096a8;--in:#242733;--bd:#2a2d3a}}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--tx);height:100dvh}
+button,input{font:inherit;color:inherit}input{background:var(--in);border:1px solid var(--bd);border-radius:12px;padding:11px 14px;width:100%}
+button{border:0;border-radius:12px;padding:10px 16px;background:var(--ac);color:#fff;cursor:pointer;min-height:40px}button.g{background:var(--in);color:var(--tx)}
+.card{background:var(--card);border-radius:20px;padding:24px;box-shadow:0 8px 30px #0001}.c{max-width:380px;margin:8vh auto;display:grid;gap:12px}
+#app{display:grid;grid-template-columns:320px 1fr;height:100dvh}#side{background:var(--card);border-right:1px solid var(--bd);overflow:auto;padding:16px;display:grid;gap:10px;align-content:start}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 0}.dot{width:9px;height:9px;border-radius:50%;background:#9aa;display:inline-block;margin-right:6px}.dot.on{background:#22c55e}
+#main{display:flex;flex-direction:column;height:100dvh;min-width:0}#msgs{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:6px}
+.m{max-width:75%;padding:9px 13px;border-radius:18px;background:var(--in);align-self:flex-start;word-wrap:break-word;white-space:pre-wrap}.m.me{align-self:flex-end;background:var(--ac);color:#fff}
+.m small{display:block;opacity:.7;font-size:11px;margin-top:2px}.q{font-size:12px;opacity:.75;border-left:3px solid currentColor;padding-left:6px;margin-bottom:4px}
+#bar{display:flex;gap:8px;padding:12px;border-top:1px solid var(--bd)}h4{margin:8px 0 0;color:var(--mut);font-size:12px;text-transform:uppercase}.hide{display:none!important}
+.mid{margin:auto;text-align:center;color:var(--mut)}#back{display:none}
+@media(max-width:700px){#app{grid-template-columns:1fr}#main{display:none}#app.chat #side{display:none}#app.chat #main{display:flex}#back{display:inline-block}}
+</style></head><body>
+<div id="auth" class="c hide"><div class="card" style="display:grid;gap:12px"><h2 style="margin:0">PrivateConnect</h2><p style="margin:0;color:var(--mut)">Private conversations. Just between friends.</p>
+<input id="u" placeholder="Username" autocomplete="username"><input id="d" placeholder="Display name (sign up)"><input id="p" type="password" placeholder="Password (8+)" autocomplete="current-password">
+<button onclick="auth('signup')">Create Account</button><button class="g" onclick="auth('login')">Login</button><div id="aerr" style="color:#e5484d"></div></div></div>
+<div id="app" class="hide"><div id="side"><div class="row"><b id="me"></b><button class="g" onclick="api('logout','POST').then(()=>location.reload())">Logout</button></div>
+<div class="row"><span>Code: <b id="code"></b></span><button class="g" onclick="navigator.clipboard.writeText($('code').textContent)">Copy</button></div>
+<div class="row"><input id="t" placeholder="Friend Code or username"><button onclick="addF()">Add</button></div><div id="err" style="color:#e5484d"></div>
+<h4>Requests</h4><div id="inc"></div><h4>Friends</h4><div id="fl"></div><h4>Pending sent</h4><div id="out"></div></div>
+<div id="main"><div class="mid" id="empty">Your private conversations will appear here.</div>
+<div id="chatv" class="hide" style="display:flex;flex-direction:column;height:100%"><div class="row" style="padding:12px;border-bottom:1px solid var(--bd)"><button id="back" class="g" onclick="app.classList.remove('chat')">←</button><b id="ct" style="flex:1"></b><span id="ty" style="color:var(--mut);font-size:12px"></span>
+<button class="g" onclick="lockUI()">🔒</button><button class="g" onclick="rep()">Report</button></div>
+<div id="lock" class="mid hide"><h3>🔒 Private Chat</h3><p>This conversation is protected.</p><input id="pin" type="password" placeholder="Chat password" style="max-width:240px"><br><br><button onclick="unlock()">Unlock</button><div id="lerr" style="color:#e5484d"></div></div>
+<div id="msgs"></div><div id="rp" class="hide" style="padding:6px 12px;color:var(--mut)"></div><div id="bar"><input id="tx" placeholder="Type a message..." maxlength="4000"><button onclick="send()">Send</button></div></div></div></div>
+<script src="/socket.io/socket.io.js"></script><script>
+const $=i=>document.getElementById(i);let cur=null,peer=null,replyTo=null,io_,tt;
+const api=(p,m='GET',b)=>fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json','X-Requested-With':'pc'},body:b?JSON.stringify(b):undefined}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(j.error||'Something went wrong.'),{status:r.status,locked:j.locked});return j});
+const el=(t,txt,cls)=>{const e=document.createElement(t);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e};
+async function auth(k){try{await api(k,'POST',{username:$('u').value,display_name:$('d').value,password:$('p').value});init()}catch(e){$('aerr').textContent=e.message}}
+async function init(){try{const m=await api('me');$('auth').classList.add('hide');$('app').classList.remove('hide');$('me').textContent=m.display_name+' @'+m.username;$('code').textContent=m.friend_code;
+ if(!io_){io_=io();io_.on('friends',load);io_.on('message',e=>{if(e.chat===cur)loadMsgs();else load()});io_.on('deleted',e=>e.chat===cur&&loadMsgs());
+ io_.on('typing',e=>{if(e.chat===cur){$('ty').textContent='typing…';clearTimeout(tt);tt=setTimeout(()=>$('ty').textContent='',1500)}})}load()}catch{$('auth').classList.remove('hide')}}
+function fr(list,btns){const box=el('div');list.forEach(u=>{const r=el('div',null,'row'),n=el('span');n.append(el('span',null,'dot'+(u.online?' on':'')),u.display_name+' @'+u.username);r.append(n);
+ const w=el('span');btns(u).forEach(([l,f])=>{const b=el('button',l,'g');b.onclick=f;b.style.marginLeft='4px';w.append(b)});r.append(w);box.append(r)});return box}
+const act=(u,a)=>api('friends/'+u.username+'/'+a,'POST').then(load).catch(e=>$('err').textContent=e.message);
+async function load(){const d=await api('friends');
+ $('inc').replaceChildren(fr(d.incoming,u=>[['✓',()=>act(u,'accept')],['✗',()=>act(u,'decline')],['Block',()=>act(u,'block')]]));
+ $('fl').replaceChildren(fr(d.friends,u=>[['Message',()=>openChat(u)],['⋯',()=>confirm('Remove friend? (OK=remove, Cancel=keep)')&&act(u,'remove')],['Block',()=>confirm('Block @'+u.username+'?')&&act(u,'block')]]));
+ $('out').replaceChildren(fr(d.outgoing,u=>[['Cancel',()=>act(u,'cancel')]]));
+ if(!d.friends.length)$('fl').textContent="You haven't added any friends yet."}
+async function addF(){try{await api('friends/request','POST',{target:$('t').value});$('t').value='';$('err').textContent='';load()}catch(e){$('err').textContent=e.message}}
+async function openChat(u){peer=u;const r=await api('chats/open','POST',{username:u.username});cur=r.uid;$('empty').classList.add('hide');$('chatv').classList.remove('hide');$('ct').textContent=u.display_name;$('app').classList.add('chat');
+ if(r.locked)showLock();else loadMsgs()}
+function showLock(){$('lock').classList.remove('hide');$('msgs').classList.add('hide');$('bar').classList.add('hide')}
+function hideLock(){$('lock').classList.add('hide');$('msgs').classList.remove('hide');$('bar').classList.remove('hide');$('pin').value='';$('lerr').textContent=''}
+async function unlock(){try{await api('chats/'+cur+'/unlock','POST',{pin:$('pin').value});hideLock();loadMsgs()}catch(e){$('lerr').textContent=e.message}}
+async function lockUI(){const p=prompt('Set a chat password (4+ chars), or leave empty to disable lock / re-lock:');
+ try{if(p)await api('chats/'+cur+'/lock','POST',{pin:p,current:prompt('Current chat password (leave empty if none):')||undefined});
+ else if(confirm('OK = disable lock (needs current password). Cancel = just lock now.')){await api('chats/'+cur+'/lock','POST',{current:prompt('Current chat password:')||''})}
+ else{await api('chats/'+cur+'/relock','POST');showLock()}}catch(e){alert(e.message)}}
+async function loadMsgs(){try{const d=await api('chats/'+cur+'/messages');hideLock();const b=$('msgs');b.replaceChildren();
+ d.messages.forEach(m=>{const e=el('div',null,'m'+(m.mine?' me':''));if(m.reply_text)e.append(el('div',m.reply_text.slice(0,80),'q'));
+  e.append(m.deleted_at?el('i','This message was deleted.'):el('span',m.text));const t=new Date(m.created_at*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  e.append(el('small',t+(m.mine?(m.read_at?' ✓✓':' ✓'):'')));
+  if(!m.deleted_at){e.oncontextmenu=ev=>{ev.preventDefault();const c=prompt('r = reply, c = copy'+(m.mine?', d = delete':''));
+   if(c==='r'){replyTo=m.id;$('rp').textContent='Replying: '+m.text.slice(0,60);$('rp').classList.remove('hide')}else if(c==='c')navigator.clipboard.writeText(m.text);else if(c==='d'&&m.mine)api('chats/'+cur+'/messages/'+m.id,'DELETE').then(loadMsgs)}}
+  b.append(e)});b.scrollTop=b.scrollHeight}catch(e){if(e.locked)showLock();else alert(e.message)}}
+async function send(){const t=$('tx').value.trim();if(!t)return;try{await api('chats/'+cur+'/messages','POST',{text:t,reply_to:replyTo});$('tx').value='';replyTo=null;$('rp').classList.add('hide');loadMsgs()}catch(e){if(e.locked)showLock();else alert(e.message)}}
+$('tx').addEventListener('keydown',e=>e.key==='Enter'&&send());$('tx').addEventListener('input',()=>io_&&cur&&io_.emit('typing',cur));
+function rep(){const r=prompt('Reason: spam / harassment / scam / threat / inappropriate / other');if(r)api('report','POST',{username:peer.username,reason:r}).then(()=>alert('Report sent.'))}
+init();</script></body></html>
