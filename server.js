@@ -123,5 +123,7 @@ io.on('connection',s=>{const me=s.request.session.uid;s.join('u:'+me);
  s.on('typing',uid=>{const c=db.prepare('SELECT * FROM chats WHERE uid=? AND (user1_id=? OR user2_id=?)').get(String(uid).slice(0,40),me,me);
   if(c&&friends(c.user1_id,c.user2_id)&&!blocked(c.user1_id,c.user2_id))io.to('u:'+(c.user1_id===me?c.user2_id:c.user1_id)).emit('typing',{chat:c.uid});});
  s.on('disconnect',()=>db.prepare("UPDATE users SET last_seen=strftime('%s','now') WHERE id=?").run(me));});
+// ---- plugins (see loader.js, plugins/ and webplugins/)
+require('./loader')({app,express,db,io,need,A,S,bcrypt,crypto,userBy,friends,blocked,pub,chatFor,rateLimit});
 app.use(express.static('public'));
 http.listen(process.env.PORT||3000,()=>console.log('PrivateConnect running on :'+(process.env.PORT||3000)));
